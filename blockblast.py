@@ -116,7 +116,7 @@ class BlockBlast:
 
 if __name__ == '__main__':
     game = BlockBlast()
-    game.place('L1', (0, 0))
+    game.place('L1', (3, 3))
 
     game.render()
 
