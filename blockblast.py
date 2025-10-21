@@ -26,14 +26,14 @@ class BlockBlast:
             'line3v'    : 0b1_1_1,
             'line4v'    : 0b1_1_1_1,
             'line5v'    : 0b1_1_1_1_1,
-            'l1'        : 0b10_10_11,
-            'l2'        : 0b111_100,
-            'l3'        : 0b11_01_01,
-            'l4'        : 0b001_111,
             'diag2'     : 0b01_10,
             'diag3'     : 0b001_010_100,
             'diag2f'    : 0b10_01,
             'diag3f'    : 0b100_010_001,
+            'l1'        : 0b10_10_11,
+            'l2'        : 0b111_100,
+            'l3'        : 0b11_01_01,
+            'l4'        : 0b001_111,
             'l1f'       : 0b01_01_11,
             'l2f'       : 0b100_111,
             'l3f'       : 0b11_10_10,
@@ -46,6 +46,10 @@ class BlockBlast:
             's2'        : 0b10_11_01,
             's1f'       : 0b110_011,
             's2f'       : 0b01_11_10,
+            'L1'        : 0b100_100_111,
+            'L2'        : 0b111_100_100,
+            'L3'        : 0b111_001_001,
+            'L4'        : 0b001_001_111
         }
         self.name_to_size = {
             'sq1'       : (1, 1),
@@ -59,14 +63,14 @@ class BlockBlast:
             'line3v'    : (1, 3),
             'line4v'    : (1, 4),
             'line5v'    : (1, 5),
-            'l1'        : (2, 3),
-            'l2'        : (3, 2),
-            'l3'        : (2, 3),
-            'l4'        : (3, 2),
             'diag2'     : (2, 2),
             'diag3'     : (3, 3),
             'diag2f'    : (2, 2),
             'diag3f'    : (3, 3),
+            'l1'        : (2, 3),
+            'l2'        : (3, 2),
+            'l3'        : (2, 3),
+            'l4'        : (3, 2),
             'l1f'       : (2, 3),
             'l2f'       : (3, 2),
             'l3f'       : (2, 3),
@@ -79,6 +83,10 @@ class BlockBlast:
             's2'        : (2, 3),
             's1f'       : (3, 2),
             's2f'       : (2, 3),
+            'L1'        : (3, 3),
+            'L2'        : (3, 3),
+            'L3'        : (3, 3),
+            'L4'        : (3, 3)
         }
     
         self.name_to_pieces_scaled = {}
@@ -93,11 +101,11 @@ class BlockBlast:
 
     def place(self, piece_name:str, position:tuple[int, int]):
         p = self.name_to_pieces_scaled[piece_name]
-        self.board |= p >> position[0] + position[1]*self.board_size[0]
+        self.board |= p << position[0] + position[1]*self.board_size[0]
 
     def render(self):
         sl = []
-        b = bin(self.board)[2:].ljust(math.prod(self.board_size), '0')
+        b = bin(self.board)[2:].rjust(math.prod(self.board_size), '0')
         board_size_x = self.board_size[0]
         for y in range(self.board_size[1]):
             sl.append(b[y*board_size_x : (y+1)*board_size_x])
@@ -108,7 +116,7 @@ class BlockBlast:
 
 if __name__ == '__main__':
     game = BlockBlast()
-    game.place('sq3', (0, 0))
+    game.place('L1', (0, 0))
 
     game.render()
 
