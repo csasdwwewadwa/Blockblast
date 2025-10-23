@@ -19,8 +19,12 @@ class BlockBlast:
         self.width, self.height = board_size
         
         # The game state is represented by a single integer (bitboard).
-        self.board = 0
-        self.score = 0
+        self.board:int = 0
+        self.score:int = 0
+        self.combo:int = -1
+        self.score_increment:float = 0
+        self.score_incremental_acceleration:float = 0
+        self.lines_cleared_score_multiplier_map:dict[int, float] = {1:1., 2:2., 3:6., 4:12., 5:20., 6:30.,}
         self.game_over = False
 
         self._initialize_piece_data()
@@ -169,8 +173,26 @@ class BlockBlast:
         # Clear the lines from the board
         if lines_cleared > 0:
             self.board &= ~cleared_mask
-            # Scoring: bonus for lines cleared
-            self.score += (lines_cleared * self.width) * lines_cleared
+
+            self.combo += 1
+
+            # Scoring calculation
+            match self.combo:
+                case 0:
+                    self.score_incremental_acceleration = 34.2     # TODO: base seed affects this (idk how base seed even is calculated as of now)
+                case 5:
+                    self.score_incremental_acceleration *= 4       # 4
+                case 6:
+                    self.score_incremental_acceleration *= 0.375   # 3/8
+                case 10:
+                    self.score_incremental_acceleration *= 4.6666  # 14/3
+                case 11:
+                    self.score_incremental_acceleration *= 0.2857  # 2/7
+            
+            self.score_increment += self.score_incremental_acceleration
+            this_is_the_true_score_increment = int(self.score_increment * self.lines_cleared_score_multiplier_map[lines_cleared])
+            self.score += this_is_the_true_score_increment
+        
 
         # Replenish pieces and check for game over
         self.current_pieces.remove(piece_name)
@@ -182,7 +204,7 @@ class BlockBlast:
             
         return {
             "status": "success",
-            "score_gained": num_blocks + ((lines_cleared * self.width) * lines_cleared),
+            "score": self.score,
             "lines_cleared": lines_cleared,
             "game_over": self.game_over
         }
@@ -190,7 +212,7 @@ class BlockBlast:
     def render(self):
         """Prints a human-readable representation of the board."""
         print(f"Score: {self.score}")
-        print("-" * (self.width * 2 + 1))
+        print("_" * (self.width * 2 + 1))
         for r in range(self.height):
             row_str = "|"
             for c in range(self.width):
