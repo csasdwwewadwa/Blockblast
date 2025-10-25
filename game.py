@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 
 class BlockBlast:
     """
@@ -116,7 +117,7 @@ class BlockBlast:
             'sL3'       : (2, 2),
             'sL4'       : (2, 2)
         }
-
+        
     def _precompute_masks(self):
         self.name_to_piece_masks = {}
         for name, compact_mask in self.name_to_pieces.items():
@@ -133,27 +134,37 @@ class BlockBlast:
             for r in range(self.height):
                 self.col_masks[c] |= 1 << (r * self.width + c)
 
+    def _can_place_piece(self, board:int, piece_name: str) -> bool:
+        """Checks if a given piece can be placed anywhere on the board. Returns valid position if there is"""
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.is_valid_move(board, piece_name, (x, y)):
+                    return (x, y)
+        return False
+
     def _deal_new_pieces(self):
         self.current_pieces = random.sample(self.all_piece_names, 3)
 
-    def _can_place_piece(self, piece_name: str) -> bool:
-        """Checks if a given piece can be placed anywhere on the board."""
-        for r in range(self.height):
-            for c in range(self.width):
-                if self.is_valid_move(piece_name, (c, r)):
-                    return True
-        return False
-
     def _guaranteed_deal_new_pieces(self):
         """
-        Deals a set of 3 new pieces, ensuring at least one of them can be
-        placed on the board. Aims for diversity in the chosen pieces.
+        Deals a set of 3 new pieces, guarantees at least a way to place all 3 of them on board
         """
         self.current_pieces = []
-        placeable_pieces = self.all_piece_names.copy()
-        for _ in range(3):
-            placeable_pieces = [name for name in placeable_pieces if self._can_place_piece(name)]
-            self.current_pieces.append(random.choice(placeable_pieces))
+        all_pieces_choices = self.all_piece_names.copy()
+        random.shuffle(all_pieces_choices)
+
+        board = self.board
+
+        while True:
+            for name in all_pieces_choices:
+                placable_position = self._can_place_piece(board, name)
+                if placable_position:
+                    board = self.try_move(board, name, placable_position)['board']
+                    self.current_pieces.append(name)
+                    if len(self.current_pieces) == 3:
+                        break
+            if len(self.current_pieces) == 3:
+                break
 
         random.shuffle(self.current_pieces)
 
@@ -161,14 +172,14 @@ class BlockBlast:
         px, py = position
         return self.name_to_piece_masks[piece_name] << (py * self.width + px)
 
-    def is_valid_move(self, piece_name: str, position: tuple[int, int]) -> bool:
+    def is_valid_move(self, board:int, piece_name: str, position: tuple[int, int]) -> bool:
         piece_w, piece_h = self.name_to_size[piece_name]
         px, py = position
 
         if px < 0 or py < 0 or px + piece_w > self.width or py + piece_h > self.height:
             return False
 
-        if (self.board & self.get_piece_mask(piece_name, position)) != 0:
+        if (board & self.get_piece_mask(piece_name, position)) != 0:
             return False
             
         return True
@@ -179,7 +190,7 @@ class BlockBlast:
             moves = []
             for r in range(self.height):
                 for c in range(self.width):
-                    if self.is_valid_move(name, (c, r)):
+                    if self.is_valid_move(self.board, name, (c, r)):
                         moves.append((c, r))
             if moves:
                 possible_moves[name] = moves
@@ -190,7 +201,7 @@ class BlockBlast:
             return {"status": "error", "message": "Game is over."}
         if piece_name not in self.current_pieces:
             return {"status": "error", "message": f"Piece '{piece_name}' unavailable."}
-        if not self.is_valid_move(piece_name, position):
+        if not self.is_valid_move(self.board, piece_name, position):
             return {"status": "error", "message": "Invalid move."}
         
         self.board |= self.get_piece_mask(piece_name, position)
@@ -243,10 +254,46 @@ class BlockBlast:
             
         return {
             "status": "success",
+            "board": self.board,
             "score": self.score,
             "lines_cleared": lines_cleared,
             "game_over": self.game_over
         }
+
+    def try_move(self, board: int, piece_name: str, position: tuple[int, int]) -> dict[str, str|int|bool]:
+        if not self.is_valid_move(board, piece_name, position):
+            return {"status": "error", "message": "Invalid move."}
+        
+        board |= self.get_piece_mask(piece_name, position)
+        
+        lines_cleared = 0
+        cleared_mask = 0
+        
+        for row_mask in self.row_masks:
+            if (board & row_mask) == row_mask:
+                lines_cleared += 1
+                cleared_mask |= row_mask
+                
+        for col_mask in self.col_masks:
+            if (board & col_mask) == col_mask:
+                lines_cleared += 1
+                cleared_mask |= col_mask
+        
+        if lines_cleared > 0:
+            board &= ~cleared_mask
+        
+        game_over = False
+        if not self.get_possible_moves():
+            game_over = True
+            
+        return {
+            "status": "success",
+            "board": board,
+            "lines_cleared": lines_cleared,
+            "game_over": game_over
+        }
+
+
 
     def render(self):
         print(f"Score: {self.score}")
@@ -261,6 +308,8 @@ class BlockBlast:
             print("Available Pieces:", self.current_pieces)
         else:
             print("GAME OVER")
+
+print('Loaded Game')
 
 if __name__ == '__main__':
     game = BlockBlast(board_size=(8, 8))

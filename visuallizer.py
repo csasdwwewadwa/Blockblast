@@ -1,14 +1,12 @@
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "1"
+
 import pygame
 import sys
 import math
-from game import BlockBlast # Assuming the cleaned code is in a file named game.py
+from game import BlockBlast
 
 class BlockBlastVisuallized(BlockBlast):
-    """
-    A subclass of BlockBlast with a polished Pygame GUI, featuring a full HUD with
-    score, persistent combo, and animated score increments.
-    """
-
     def __init__(self, board_size: tuple[int, int] = (8, 8), seed: int = None, is_guranteed_valid_moves = True):
         super().__init__(board_size, seed, is_guranteed_valid_moves)
 
@@ -61,6 +59,9 @@ class BlockBlastVisuallized(BlockBlast):
         # Dragging and Animation
         self.drag_info = {}
         self.animation = {}
+        
+        # Bot control
+        self.autoplay = False
     
     # Overriding make_move to capture the score change for the HUD
     def make_move(self, piece_name: str, position: tuple[int, int]) -> dict:
@@ -74,33 +75,6 @@ class BlockBlastVisuallized(BlockBlast):
                 self.last_score_increment = increment
                 self.score_increment_alpha = 255
         
-        return result
-
-    # --- NEW FUNCTION ---
-    def place_piece(self, piece_name: str, position: tuple[int, int]) -> dict:
-        """
-        Programmatically places a piece on the board if the move is valid.
-
-        This function simulates a valid piece placement, updating the game state.
-        The main game loop will then handle updating the screen.
-
-        Args:
-            piece_name: The name of the piece to place (e.g., 'sq1').
-            position: A tuple (x, y) representing the grid coordinates.
-
-        Returns:
-            dict: The result from the make_move call, indicating success or failure.
-        """
-        if self.ui_state not in ['IDLE']:
-            return {"status": "error", "message": "Cannot place piece while animating."}
-            
-        # The make_move method already contains the necessary validation.
-        # It checks for piece availability and move validity.
-        result = self.make_move(piece_name, position)
-        
-        if result.get("status") == "error":
-            print(f"Programmatic placement failed: {result.get('message')}")
-
         return result
 
     def _create_piece_surface(self, piece_name, cell_size, padding):
@@ -179,7 +153,7 @@ class BlockBlastVisuallized(BlockBlast):
     def draw_ghost_piece(self, piece_name, grid_pos):
         """Draws a semi-transparent preview with borders."""
         px, py = grid_pos
-        if self.is_valid_move(piece_name, (px, py)):
+        if self.is_valid_move(self.board, piece_name, (px, py)):
             piece_w, piece_h = self.name_to_size[piece_name]
             for r in range(piece_h):
                 for c in range(piece_w):
@@ -202,17 +176,6 @@ class BlockBlastVisuallized(BlockBlast):
                 pygame.quit(), sys.exit()
 
             if self.game_over: continue
-            
-            # --- DEMONSTRATION OF place_piece FUNCTION ---
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_p:
-                if self.ui_state == 'IDLE':
-                    possible_moves = self.get_possible_moves()
-                    if possible_moves:
-                        piece_to_place = list(possible_moves.keys())[0]
-                        position_to_place = possible_moves[piece_to_place][0]
-                        print(f"Programmatically placing '{piece_to_place}' at {position_to_place} via keypress.")
-                        self.place_piece(piece_to_place, position_to_place)
-
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.ui_state == 'IDLE':
                 for piece_name, rect in self.piece_tray_rects.items():
@@ -235,7 +198,7 @@ class BlockBlastVisuallized(BlockBlast):
                             round((top_left_pos[1] - self.margin) / self.cell_size))
                 
                 self.ui_state = 'ANIMATING_DROP'
-                is_valid = self.is_valid_move(self.drag_info['name'], grid_pos)
+                is_valid = self.is_valid_move(self.board, self.drag_info['name'], grid_pos)
                 self.animation = {
                     'start_time': pygame.time.get_ticks(), 'duration': 150 if is_valid else 250,
                     'start_pos': top_left_pos, 'end_pos': (self.margin + grid_pos[0] * self.cell_size, self.margin + grid_pos[1] * self.cell_size),
@@ -296,7 +259,7 @@ class BlockBlastVisuallized(BlockBlast):
                 self.drag_info = {}
 
     def run(self):
-        """Main game loop."""
+        """Main game loop for manual play."""
         clock = pygame.time.Clock()
         while True:
             self.handle_input()
@@ -328,6 +291,70 @@ class BlockBlastVisuallized(BlockBlast):
             pygame.display.flip()
             clock.tick(60)
 
+    def run_bot_play(self, bot):
+        """
+        Main game loop for bot-controlled play.
+        - Press 'P' to play a single move from the bot.
+        - Press 'Q' to toggle autoplay, making the bot play continuously.
+        """
+        clock = pygame.time.Clock()
+        self.autoplay = False
+
+        while True:
+            # --- Event Handling for Bot Control ---
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_q:
+                        self.autoplay = not self.autoplay
+                        print(f"Autoplay turned {'ON' if self.autoplay else 'OFF'}")
+                    
+                    if event.key == pygame.K_p and not self.autoplay:
+                        if self.ui_state == 'IDLE' and not self.game_over:
+                            piece, position = bot(self)
+                            if piece and position is not None:
+                                self.make_move(piece, position)
+
+            # --- Autoplay Logic ---
+            if self.autoplay and self.ui_state == 'IDLE' and not self.game_over:
+                piece, position = bot(self)
+                if piece and position is not None:
+                    self.make_move(piece, position)
+            
+            # --- Standard Game Updates and Drawing ---
+            self.update() 
+            
+            self.draw_board()
+            self.draw_hud()
+            self.draw_pieces_in_tray()
+
+            if self.game_over:
+                text = self.game_over_font.render("GAME OVER", True, self.colors["game_over"])
+                text_rect = text.get_rect(center=(
+                    (self.width * self.cell_size + 2 * self.margin) / 2, self.screen.get_height() / 2))
+                self.screen.blit(text, text_rect)
+
+            pygame.display.flip()
+            clock.tick(60)
+
+print('Loaded Visuallizer')
+
+
 if __name__ == '__main__':
+    from bots.simple import Solver
+
+    solver = None
+    solution = []
+
+    def bot(game):
+        global solver, solution
+        if not solver:
+            solver = Solver(game)
+        return solver.solve()
+
     game = BlockBlastVisuallized(board_size=(8, 8), seed=42)
+    # game.run_bot_play(bot)
     game.run()
