@@ -136,8 +136,8 @@ class BlockBlast:
 
     def _can_place_piece(self, board:int, piece_name: str) -> bool:
         """Checks if a given piece can be placed anywhere on the board. Returns valid position if there is"""
-        for y in range(self.height):
-            for x in range(self.width):
+        for y in random.sample(range(self.height), self.height):
+            for x in random.sample(range(self.width), self.width):
                 if self.is_valid_move(board, piece_name, (x, y)):
                     return (x, y)
         return False
@@ -222,12 +222,12 @@ class BlockBlast:
         
         if lines_cleared > 0:
             self.board &= ~cleared_mask
-            self.not_combo_counter = 3
 
             if self.not_combo_counter + lines_cleared <= 1:
                 self.combo = -1
                 self.score_increment = 0
 
+            self.not_combo_counter = 3
             self.combo += 1
             
             match self.combo:
@@ -308,8 +308,6 @@ class BlockBlast:
             print("Available Pieces:", self.current_pieces)
         else:
             print("GAME OVER")
-
-print('Loaded Game')
 
 if __name__ == '__main__':
     game = BlockBlast(board_size=(8, 8))

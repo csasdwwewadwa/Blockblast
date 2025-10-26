@@ -225,6 +225,7 @@ class BlockBlastVisuallized(BlockBlast):
         if self.ui_state == 'ANIMATING_PICKUP':
             current_scale = self.animation['start_scale'] + (1.0 - self.animation['start_scale']) * eased_progress
             mouse_pos = pygame.mouse.get_pos()
+            print(pygame.mouse.get_pos())
             scaled_offset = (self.drag_info['offset'][0] * (current_scale / self.tray_scale_factor),
                              self.drag_info['offset'][1] * (current_scale / self.tray_scale_factor))
             end_pos = (mouse_pos[0] - scaled_offset[0], mouse_pos[1] - scaled_offset[1])
@@ -325,7 +326,7 @@ class BlockBlastVisuallized(BlockBlast):
                     self.make_move(piece, position)
             
             # --- Standard Game Updates and Drawing ---
-            self.update() 
+            self.update()
             
             self.draw_board()
             self.draw_hud()
@@ -339,8 +340,6 @@ class BlockBlastVisuallized(BlockBlast):
 
             pygame.display.flip()
             clock.tick(60)
-
-print('Loaded Visuallizer')
 
 
 if __name__ == '__main__':
