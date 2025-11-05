@@ -15,7 +15,6 @@ class Solver:
             if not pieces:
                 yield []
                 return
-
             for i, p in enumerate(pieces):
                 for y in range(self.game.height):
                     for x in range(self.game.width):

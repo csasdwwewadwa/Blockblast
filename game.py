@@ -168,7 +168,7 @@ class BlockBlast:
 
         random.shuffle(self.current_pieces)
 
-    def get_piece_mask(self, piece_name: str, position: tuple[int, int]) -> int:
+    def _get_piece_mask(self, piece_name: str, position: tuple[int, int]) -> int:
         px, py = position
         return self.name_to_piece_masks[piece_name] << (py * self.width + px)
 
@@ -179,12 +179,12 @@ class BlockBlast:
         if px < 0 or py < 0 or px + piece_w > self.width or py + piece_h > self.height:
             return False
 
-        if (board & self.get_piece_mask(piece_name, position)) != 0:
+        if (board & self._get_piece_mask(piece_name, position)) != 0:
             return False
             
         return True
 
-    def get_possible_moves(self) -> dict[str, list[tuple[int, int]]]:
+    def get_valid_moves(self) -> dict[str, list[tuple[int, int]]]:
         possible_moves = {}
         for name in self.current_pieces:
             moves = []
@@ -195,6 +195,19 @@ class BlockBlast:
             if moves:
                 possible_moves[name] = moves
         return possible_moves
+    
+
+    def get_all_moves_for_all_pieces(self) -> dict[str, list[tuple[int, int]]]:
+        all_moves = {}
+        for name in self.all_piece_names:
+            moves = []
+            for r in range(self.height):
+                for c in range(self.width):
+                    moves.append((c, r))
+            if moves:
+                all_moves[name] = moves
+        return all_moves
+    
 
     def make_move(self, piece_name: str, position: tuple[int, int]) -> dict:
         if self.game_over:
@@ -204,7 +217,7 @@ class BlockBlast:
         if not self.is_valid_move(self.board, piece_name, position):
             return {"status": "error", "message": "Invalid move."}
         
-        self.board |= self.get_piece_mask(piece_name, position)
+        self.board |= self._get_piece_mask(piece_name, position)
         self.score += self.name_to_pieces[piece_name].bit_count()
         
         lines_cleared = 0
@@ -249,7 +262,7 @@ class BlockBlast:
             else:
                 self._deal_new_pieces()
         
-        if not self.get_possible_moves():
+        if not self.get_valid_moves():
             self.game_over = True
             
         return {
@@ -264,7 +277,7 @@ class BlockBlast:
         if not self.is_valid_move(board, piece_name, position):
             return {"status": "error", "message": "Invalid move."}
         
-        board |= self.get_piece_mask(piece_name, position)
+        board |= self._get_piece_mask(piece_name, position)
         
         lines_cleared = 0
         cleared_mask = 0
@@ -283,7 +296,7 @@ class BlockBlast:
             board &= ~cleared_mask
         
         game_over = False
-        if not self.get_possible_moves():
+        if not self.get_valid_moves():
             game_over = True
             
         return {
@@ -319,7 +332,7 @@ if __name__ == '__main__':
 
         input()
         
-        moves = game.get_possible_moves()
+        moves = game.get_valid_moves()
         if not moves:
             game.game_over = True
             break
